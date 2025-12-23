@@ -1,10 +1,14 @@
-# Blocchiamo solo l'agente alla versione che supporta "Pipeline"
+# Blocchiamo l'agente alla versione legacy che supporta "Pipeline"
 livekit-agents==0.12.1
 
-# Lasciamo i plugin liberi di scaricare la versione compatibile con l'agente sopra
-livekit-plugins-deepgram
-livekit-plugins-openai
-livekit-plugins-elevenlabs
+# --- FIX IMPORTANTE ---
+# Dobbiamo bloccare anche il plugin OpenAI a una versione compatibile con la 0.12.x
+# La versione 0.9.0+ introduce le modifiche che causano il tuo crash.
+livekit-plugins-openai==0.8.0
+
+# Anche per gli altri è prudente evitare le versioni "bleeding edge" se usi un core vecchio
+livekit-plugins-deepgram<0.8.0
+livekit-plugins-elevenlabs<0.9.0
 livekit-plugins-silero
 
 # Utility
