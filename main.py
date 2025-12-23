@@ -4,8 +4,7 @@ import aiohttp
 from dotenv import load_dotenv
 
 from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, cli, llm
-# Se l'installazione va a buon fine, questo import ORA funzionerà
-from livekit.agents.pipeline import VoicePipelineAgent 
+from livekit.agents.pipeline import VoicePipelineAgent
 from livekit.plugins import deepgram, elevenlabs, openai, silero
 from typing import Annotated
 
@@ -41,11 +40,18 @@ async def entrypoint(ctx: JobContext):
             api_key=os.getenv("GROQ_API_KEY"),
             model="llama3-70b-8192",
         ),
+        # --- CORREZIONE QUI ---
         tts=elevenlabs.TTS(
             api_key=os.getenv("ELEVENLABS_API_KEY"),
-            voice_id="JBFqnCBsd6RMkjVDRZzb",
-            model_id="eleven_turbo_v2_5"
+            # Nella nuova versione si usa l'oggetto Voice, non voice_id
+            voice=elevenlabs.Voice(
+                id="JBFqnCBsd6RMkjVDRZzb", # George
+                name="George",
+                category="premade"
+            ),
+            model="eleven_turbo_v2_5" # Nota: 'model', non 'model_id'
         ),
+        # ----------------------
         fnc_ctx=RealEstateTools(),
         chat_ctx=initial_ctx
     )
