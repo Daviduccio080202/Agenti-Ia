@@ -3,9 +3,14 @@ import os
 import aiohttp
 from dotenv import load_dotenv
 
-# --- NUOVI IMPORT PER LA VERSIONE 0.12+ ---
+# --- DEBUG VERSION ---
+import livekit.agents
+print(f"VERSIONE LIVEKIT INSTALLATA: {livekit.agents.__version__}")
+# ---------------------
+
 from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, cli, llm
-from livekit.agents.pipeline import VoicePipelineAgent
+# Se qui dà errore, vuol dire che la versione stampata sopra è vecchia!
+from livekit.agents.pipeline import VoicePipelineAgent 
 from livekit.plugins import deepgram, elevenlabs, openai, silero
 from typing import Annotated
 
@@ -93,3 +98,4 @@ async def entrypoint(ctx: JobContext):
 
 if __name__ == "__main__":
     cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))
+
