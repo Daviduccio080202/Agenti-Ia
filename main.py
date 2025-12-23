@@ -82,7 +82,7 @@ async def entrypoint(ctx: JobContext):
         tts=elevenlabs.TTS(
             api_key=os.getenv("ELEVENLABS_API_KEY"),
             voice=elevenlabs.Voice(
-                id="JBFqnCBsd6RMkjVDRZzb", # ID Voce (George)
+                id="8KInRSd4DtD5L5gK7itu", # ID Voce (George)
                 name="George",
                 category="premade"
             ),
@@ -116,3 +116,4 @@ async def entrypoint(ctx: JobContext):
 
 if __name__ == "__main__":
     cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))
+
