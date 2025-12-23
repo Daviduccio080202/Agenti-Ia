@@ -12,6 +12,14 @@ load_dotenv()
 logger = logging.getLogger("real-estate-agent")
 logger.setLevel(logging.INFO)
 
+# --- DEBUG CHIAVI ---
+groq_key = os.getenv("GROQ_API_KEY")
+if not groq_key:
+    logger.error("❌ ERRORE CRITICO: Manca la GROQ_API_KEY nelle variabili d'ambiente!")
+else:
+    logger.info(f"✅ GROQ Key caricata: {groq_key[:4]}...{groq_key[-4:]}")
+# --------------------
+
 class RealEstateTools(llm.FunctionContext):
     @llm.ai_callable(description="Cerca immobili nel database.")
     async def search_property(self, zona: Annotated[str, llm.TypeInfo(description="Zona")]):
@@ -24,7 +32,6 @@ async def on_shutdown(ctx: JobContext, chat_ctx: llm.ChatContext):
 async def entrypoint(ctx: JobContext):
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
     
-    # Aspettiamo l'utente
     participant = await ctx.wait_for_participant()
     
     initial_ctx = llm.ChatContext().append(
@@ -38,20 +45,18 @@ async def entrypoint(ctx: JobContext):
         llm=openai.LLM(
             base_url="https://api.groq.com/openai/v1",
             api_key=os.getenv("GROQ_API_KEY"),
-            model="llama3-70b-8192",
+            # CAMBIO MODELLO: Usiamo l'8B che è più veloce e stabile per i test
+            model="llama3-8b-8192", 
         ),
-        # --- CORREZIONE QUI ---
         tts=elevenlabs.TTS(
             api_key=os.getenv("ELEVENLABS_API_KEY"),
-            # Nella nuova versione si usa l'oggetto Voice, non voice_id
             voice=elevenlabs.Voice(
-                id="JBFqnCBsd6RMkjVDRZzb", # George
+                id="JBFqnCBsd6RMkjVDRZzb",
                 name="George",
                 category="premade"
             ),
-            model="eleven_turbo_v2_5" # Nota: 'model', non 'model_id'
+            model="eleven_turbo_v2_5"
         ),
-        # ----------------------
         fnc_ctx=RealEstateTools(),
         chat_ctx=initial_ctx
     )
