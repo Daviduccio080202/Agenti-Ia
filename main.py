@@ -1,5 +1,19 @@
 import logging
 import asyncio
+import sys
+import subprocess
+
+try:
+    # Questo stamperà nei log la versione esatta installata
+    result = subprocess.run([sys.executable, "-m", "pip", "show", "livekit-agents"], capture_output=True, text=True)
+    print("--- DEBUG VERSIONE INSTALLATA ---")
+    print(result.stdout)
+    print("-------------------------------")
+except Exception as e:
+    print(f"Impossibile verificare versione: {e}")
+
+# ... poi i tuoi import ...
+from livekit.agents.pipeline import VoicePipelineAgent
 from dotenv import load_dotenv
 
 # Import del core di LiveKit Agents
@@ -79,3 +93,4 @@ async def entrypoint(ctx: JobContext):
 # Avvio dell'applicazione
 if __name__ == "__main__":
     cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))
+
