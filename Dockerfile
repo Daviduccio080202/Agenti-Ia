@@ -9,12 +9,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY requirements.txt .
 
-# --- IL TRUCCO ---
-# Questa riga forza il sistema a ignorare la cache e reinstallare tutto
-RUN echo "Forcing Update v3" 
-RUN pip install --no-cache-dir --upgrade -r requirements.txt
-# -----------------
+# FORZIAMO LA REINSTALLAZIONE PULITA
+# Usiamo --force-reinstall per essere sicuri che non usi versioni vecchie
+RUN pip install --no-cache-dir --force-reinstall -r requirements.txt
 
 COPY main.py .
+
+# DEBUG: Stampiamo cosa è stato installato davvero (lo vedrai nei log)
+RUN pip list | grep livekit
 
 CMD ["python", "main.py", "start"]
