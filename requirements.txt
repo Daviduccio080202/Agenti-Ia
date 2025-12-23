@@ -1,10 +1,8 @@
-# Forziamo le versioni più recenti per evitare conflitti
-livekit-agents>=0.12.1
-livekit-plugins-deepgram>=0.6.2
-livekit-plugins-openai>=0.6.2
-livekit-plugins-elevenlabs>=0.8.2
-livekit-plugins-silero>=0.6.2
+livekit-agents==0.12.1
+livekit-plugins-deepgram==0.6.2
+livekit-plugins-openai==0.6.2
+livekit-plugins-elevenlabs==0.8.2
+livekit-plugins-silero==0.6.2
+livekit==0.18.2
 python-dotenv
 aiohttp
-
-# Cache Buster v2
