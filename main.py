@@ -1,119 +1,81 @@
 import logging
-import os
-import aiohttp
+import asyncio
 from dotenv import load_dotenv
 
-# Import per la versione 0.12.x
-from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, cli, llm
-from livekit.agents.pipeline import VoicePipelineAgent
-from livekit.plugins import deepgram, elevenlabs, openai, silero
-from typing import Annotated
+# Import del core di LiveKit Agents
+from livekit.agents import (
+    AutoSubscribe,
+    JobContext,
+    WorkerOptions,
+    cli,
+    llm,
+)
 
-# Carica variabili d'ambiente
+# Import del nuovo agente "VoicePipelineAgent" (sostituisce il vecchio PipelineAgent)
+from livekit.agents.pipeline import VoicePipelineAgent
+
+# Import dei plugin (STT, LLM, TTS, VAD)
+from livekit.plugins import openai, deepgram, silero, elevenlabs
+
+# Carica le variabili d'ambiente (.env)
 load_dotenv()
 
-# Configurazione Logger
-logger = logging.getLogger("real-estate-agent")
-logger.setLevel(logging.INFO)
+# Configurazione Log
+logger = logging.getLogger("voice-agent")
 
-# --- DEBUG: Verifica Chiavi ---
-if not os.getenv("GROQ_API_KEY"):
-    logger.error("❌ ERRORE: Manca GROQ_API_KEY!")
-if not os.getenv("ELEVENLABS_API_KEY"):
-    logger.error("❌ ERRORE: Manca ELEVENLABS_API_KEY!")
-
-# --- 1. DEFINIZIONE TOOL (Le Capacità) ---
-class RealEstateTools(llm.FunctionContext):
-    
-    @llm.ai_callable(description="Cerca immobili nel database in base a zona e budget.")
-    async def search_property(self, 
-        zona: Annotated[str, llm.TypeInfo(description="Zona richiesta (es. Centro)")],
-        budget: Annotated[int, llm.TypeInfo(description="Budget massimo")]
-    ):
-        logger.info(f"🔎 TOOL ATTIVATO: Cerco casa in zona {zona} con budget {budget}...")
-        
-        # Qui un giorno collegherai n8n. Per ora simulo:
-        if "centro" in zona.lower():
-            return "Risultato DB: Trilocale Via Roma (250k), Bilocale Piazza Duomo (180k)."
-        return "Risultato DB: Nessun immobile trovato in questa zona."
-
-# --- 2. GESTIONE CHIUSURA CHIAMATA ---
-async def on_shutdown(ctx: JobContext, chat_ctx: llm.ChatContext):
-    logger.info("📞 Chiamata terminata. Salvataggio transcript...")
-    # Qui potrai inviare i dati a n8n in futuro
-
-# --- 3. CONFIGURAZIONE AGENTE (Il Cuore) ---
 async def entrypoint(ctx: JobContext):
-    # Connessione
-    await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
+    """
+    Funzione principale che viene eseguita quando un utente si connette.
+    """
     
-    # Aspetta che l'utente entri nella stanza (Importante!)
+    # 1. Connessione alla stanza
+    # AutoSubscribe.AUDIO_ONLY fa sì che l'agente riceva solo l'audio dell'utente
+    logger.info(f"Connessione alla stanza {ctx.room.name}...")
+    await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
+
+    # 2. Attesa del partecipante
+    # L'agente aspetta che un utente entri e inizi a trasmettere audio
     participant = await ctx.wait_for_participant()
     logger.info(f"Utente connesso: {participant.identity}")
-    
-    # Personalità Iniziale
+
+    # 3. Configurazione del "Cervello" (Il Prompt di sistema)
     initial_ctx = llm.ChatContext().append(
         role="system",
-        text="""Sei Laura, un'agente immobiliare professionale, empatica e sintetica.
-        - Il tuo obiettivo è capire cosa cerca il cliente (zona, budget, numero camere).
-        - Usa il tool 'search_property' se ti chiedono disponibilità.
-        - Parla in italiano naturale."""
+        text=(
+            "Sei un assistente vocale utile e simpatico creato con LiveKit. "
+            "Rispondi in modo breve e colloquiale, come in una vera conversazione telefonica. "
+            "Usa l'italiano."
+        )
     )
 
-    # Creazione Pipeline
+    # 4. Creazione della Pipeline Vocale
+    # Qui assembliamo i pezzi: VAD (Rilevamento voce) -> STT (Trascrizione) -> LLM (Intelligenza) -> TTS (Voce sintetica)
     agent = VoicePipelineAgent(
-        # A. Rilevamento Voce (VAD) - Configurato per ignorare rumori brevi
-        vad=silero.VAD.load(
-            min_speech_duration=0.1, # Deve sentire voce per almeno 0.1s
-            min_silence_duration=0.5, # Aspetta 0.5s di silenzio prima di considerare finita la frase
-        ),
+        vad=silero.VAD.load(),      # Rileva quando l'utente parla
         
-        # B. Orecchie (STT) - Deepgram Nova 2 (Veloce e preciso in IT)
-        stt=deepgram.STT(model="nova-2", language="it"),
-        
-        # C. Cervello (LLM) - Groq (Llama 3.3)
-        llm=openai.LLM(
-            base_url="https://api.groq.com/openai/v1",
-            api_key=os.getenv("GROQ_API_KEY"),
-            model="llama-3.3-70b-versatile", # Ultimo modello stabile
-        ),
-        
-        # D. Bocca (TTS) - ElevenLabs
-        tts=elevenlabs.TTS(
-            api_key=os.getenv("ELEVENLABS_API_KEY"),
-            voice=elevenlabs.Voice(
-                id="8KInRSd4DtD5L5gK7itu", # ID Voce (George)
-                name="George",
-                category="premade"
-            ),
-            model="eleven_turbo_v2_5"
-        ),
-        
-        # E. Collegamenti Extra
-        fnc_ctx=RealEstateTools(),
+        # Scegli il tuo STT (Trascrizione). Deepgram è molto veloce.
+        stt=deepgram.STT(language="it"), 
+        # In alternativa: stt=openai.STT(),
+
+        # Il cervello (GPT-4o-mini è veloce ed economico)
+        llm=openai.LLM(model="gpt-4o-mini"),
+
+        # Scegli il tuo TTS (Voce). 
+        # Usa OpenAI TTS per semplicità o ElevenLabs per qualità.
+        tts=openai.TTS(), 
+        # In alternativa: tts=elevenlabs.TTS(),
+
         chat_ctx=initial_ctx,
-        
-        # --- PARAMETRI DI STABILITÀ (Anti-Interruzione) ---
-        # 1. Quanto deve durare un suono per interrompere l'agente (0.6s = difficile interrompere per sbaglio)
-        interrupt_speech_duration=0.6, 
-        
-        # 2. Sensibilità all'interruzione (Parole vs Rumore)
-        interrupt_min_words=0, 
-        
-        # 3. Ritardo prima di rispondere (Evita risposte sovrapposte)
-        min_endpointing_delay=0.8,
-        # --------------------------------------------------
     )
 
-    # Callback di chiusura
-    ctx.add_shutdown_callback(lambda: on_shutdown(ctx, initial_ctx))
-
-    # Avvio Agente
+    # 5. Avvio dell'Agente
+    # Collega l'agente alla stanza e all'utente specifico
     agent.start(ctx.room, participant)
-    
-    # Saluto iniziale
-    await agent.say("Agenzia Immobiliare Domus, sono Laura. Come posso aiutarti?", allow_interruptions=True)
 
+    # 6. Saluto iniziale
+    # L'agente parla per primo
+    await agent.say("Ciao! Sono pronto. Di cosa vogliamo parlare oggi?", allow_interruptions=True)
+
+# Avvio dell'applicazione
 if __name__ == "__main__":
     cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))
-
