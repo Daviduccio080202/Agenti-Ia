@@ -12,14 +12,6 @@ load_dotenv()
 logger = logging.getLogger("real-estate-agent")
 logger.setLevel(logging.INFO)
 
-# --- DEBUG CHIAVI ---
-groq_key = os.getenv("GROQ_API_KEY")
-if not groq_key:
-    logger.error("❌ ERRORE CRITICO: Manca la GROQ_API_KEY nelle variabili d'ambiente!")
-else:
-    logger.info(f"✅ GROQ Key caricata: {groq_key[:4]}...{groq_key[-4:]}")
-# --------------------
-
 class RealEstateTools(llm.FunctionContext):
     @llm.ai_callable(description="Cerca immobili nel database.")
     async def search_property(self, zona: Annotated[str, llm.TypeInfo(description="Zona")]):
@@ -45,8 +37,10 @@ async def entrypoint(ctx: JobContext):
         llm=openai.LLM(
             base_url="https://api.groq.com/openai/v1",
             api_key=os.getenv("GROQ_API_KEY"),
-            # CAMBIO MODELLO: Usiamo l'8B che è più veloce e stabile per i test
-            model="llama3-8b-8192", 
+            # --- MODIFICA FONDAMENTALE ---
+            # Il vecchio modello è stato spento. Usiamo il nuovo Llama 3.3 (più intelligente)
+            model="llama-3.3-70b-versatile",
+            # -----------------------------
         ),
         tts=elevenlabs.TTS(
             api_key=os.getenv("ELEVENLABS_API_KEY"),
