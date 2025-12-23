@@ -1,16 +1,15 @@
-# Blocchiamo l'agente alla versione legacy che supporta "Pipeline"
+# --- CORE & AGENTS (Era Giugno 2024) ---
 livekit-agents==0.12.1
+# È importante bloccare anche il core SDK per evitare discrepanze interne
+livekit==0.12.2
 
-# --- FIX IMPORTANTE ---
-# Dobbiamo bloccare anche il plugin OpenAI a una versione compatibile con la 0.12.x
-# La versione 0.9.0+ introduce le modifiche che causano il tuo crash.
-livekit-plugins-openai==0.8.0
+# --- PLUGINS (Versioni compatibili con 0.12.x) ---
+# La versione 0.6.0 è quella stabile per l'era Pipeline
+livekit-plugins-openai==0.6.0
+livekit-plugins-deepgram==0.6.0
+livekit-plugins-elevenlabs==0.6.0
+livekit-plugins-silero==0.6.0
 
-# Anche per gli altri è prudente evitare le versioni "bleeding edge" se usi un core vecchio
-livekit-plugins-deepgram<0.8.0
-livekit-plugins-elevenlabs<0.9.0
-livekit-plugins-silero
-
-# Utility
+# --- UTILITY ---
 python-dotenv
 aiohttp
