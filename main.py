@@ -3,8 +3,9 @@ import os
 import aiohttp
 from dotenv import load_dotenv
 
+# --- NUOVI IMPORT PER LA VERSIONE 0.12+ ---
 from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, cli, llm
-from livekit.agents.voice_assistant import VoiceAssistant
+from livekit.agents.pipeline import VoicePipelineAgent
 from livekit.plugins import deepgram, elevenlabs, openai, silero
 from typing import Annotated
 
@@ -12,7 +13,7 @@ load_dotenv()
 logger = logging.getLogger("real-estate-agent")
 logger.setLevel(logging.INFO)
 
-# --- A. DEFINIZIONE DEI TOOL (Le mani dell'agente) ---
+# --- A. DEFINIZIONE DEI TOOL ---
 class RealEstateTools(llm.FunctionContext):
     
     @llm.ai_callable(description="Cerca immobili nel database in base a zona e prezzo.")
@@ -22,13 +23,13 @@ class RealEstateTools(llm.FunctionContext):
     ):
         logger.info(f"🔎 Cercando casa in zona {zona} con budget {budget}...")
         
-        # QUI UN GIORNO CHIAMERAI N8N. PER ORA SIMULIAMO:
+        # Simulazione Database
         if "centro" in zona.lower():
             return "Ho trovato un Trilocale in Via Roma a 250.000 euro e un Bilocale in Piazza Duomo a 180.000 euro."
         else:
             return "In quella zona al momento non ho disponibilità immediate, ma posso prendere nota."
 
-# --- B. DEFINIZIONE POST-CALL WEBHOOK (La memoria finale) ---
+# --- B. POST-CALL WEBHOOK ---
 async def on_shutdown(ctx: JobContext, chat_ctx: llm.ChatContext):
     logger.info("📞 Chiamata terminata. Invio dati post-call...")
     
@@ -37,36 +38,34 @@ async def on_shutdown(ctx: JobContext, chat_ctx: llm.ChatContext):
         if msg.role != "system":
             full_transcript.append(f"{msg.role}: {msg.content}")
     
-    # Payload da mandare a n8n
     payload = {
         "room_id": ctx.room.name,
         "transcript": "\n".join(full_transcript)
     }
     
-    # Inserisci qui il tuo URL di n8n (Webhook) quando lo avrai
-    webhook_url = "https://tuo-n8n.com/webhook/fine-chiamata"
-    
-    # Simuliamo l'invio (per non far crashare se non hai n8n attivo)
+    # URL fittizio per evitare errori se non hai n8n
     logger.info(f"📡 Simulo invio a n8n: {len(full_transcript)} messaggi.")
-    # (Quando avrai n8n, togli il commento sotto)
-    # async with aiohttp.ClientSession() as session:
-    #     await session.post(webhook_url, json=payload)
 
-# --- C. PUNTO DI INGRESSO (L'avvio) ---
+# --- C. PUNTO DI INGRESSO (Aggiornato) ---
 async def entrypoint(ctx: JobContext):
+    # Connessione iniziale
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
+
+    # Nelle nuove versioni, è meglio aspettare che ci sia un partecipante
+    participant = await ctx.wait_for_participant()
+    logger.info(f"Partecipante connesso: {participant.identity}")
 
     # Memoria Iniziale
     chat_context = llm.ChatContext().append(
         role="system",
-        text="""Sei Laura, un agente immobiliare professionale e gentile.
-        - Chiedi sempre budget e zona preferita.
-        - Se chiedono disponibilità, USA IL TOOL search_property.
-        - Rispondi in italiano in modo conciso."""
+        text="""Sei Laura, un agente immobiliare professionale.
+        - Chiedi budget e zona.
+        - Usa search_property se serve.
+        - Rispondi brevemente in italiano."""
     )
 
-    # Configurazione Agente
-    assistant = VoiceAssistant(
+    # --- CAMBIAMENTO QUI: VoicePipelineAgent invece di VoiceAssistant ---
+    agent = VoicePipelineAgent(
         vad=silero.VAD.load(),
         stt=deepgram.STT(model="nova-2", language="it"),
         llm=openai.LLM(
@@ -76,18 +75,21 @@ async def entrypoint(ctx: JobContext):
         ),
         tts=elevenlabs.TTS(
             api_key=os.getenv("ELEVENLABS_API_KEY"),
-            voice_id="JBFqnCBsd6RMkjVDRZzb", # George (Cambia con voce femminile se vuoi)
+            voice_id="JBFqnCBsd6RMkjVDRZzb",
             model_id="eleven_turbo_v2_5"
         ),
-        fnc_ctx=RealEstateTools(), # Colleghiamo i Tool
+        fnc_ctx=RealEstateTools(),
         chat_ctx=chat_context
     )
 
-    # Colleghiamo il Post-Call
+    # Callback di chiusura
     ctx.add_shutdown_callback(lambda: on_shutdown(ctx, chat_context))
 
-    assistant.start(ctx.room)
-    await assistant.say("Agenzia Immobiliare Domus, sono Laura. Come posso aiutarti oggi?")
+    # Avvio dell'agente (Sintassi aggiornata)
+    agent.start(ctx.room, participant)
+    
+    # Saluto iniziale
+    await agent.say("Agenzia Immobiliare Domus, sono Laura. Dimmi tutto!", allow_interruptions=True)
 
 if __name__ == "__main__":
     cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))
